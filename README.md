@@ -20,3 +20,7 @@
     ```shell script
     docker logs --follow asynctracer
     ```
+6. Stop the container:
+    ```shell script
+    docker kill asynctracer
+    ```
