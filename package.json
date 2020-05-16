@@ -3,7 +3,10 @@
   "version": "0.0.1",
   "description": "Track async services",
   "main": "index.js",
-  "scripts": {},
+  "type": "module",
+  "scripts": {
+    "worker": "node --experimental-modules src/worker"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sahnisarbjit/AsyncTracer.git"
