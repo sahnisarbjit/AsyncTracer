@@ -1,0 +1,16 @@
+version: "3.7"
+
+services:
+  worker:
+    image: "node:12"
+    container_name: worker
+    working_dir: /usr/src/app
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./:/usr/src/app
+    expose:
+      - 8080
+    ports:
+      - 8080:8080
+    command: "npm run worker"

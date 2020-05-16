@@ -1,26 +1,22 @@
 #### Basic Commands
 
-1. Build docker image:
+1. Install dependencies:
     ```shell script
-    docker build -t asynctracer .
+    docker run --rm -v $PWD:/usr/src/app -w /usr/src/app node:12 npm install
     ```
-2. Install dependencies:
+2. Run the container:
     ```shell script
-    docker run --rm -v $PWD:/usr/src/app asynctracer npm install
+    docker-compose up -d
     ```
-3. Run the container:
+3. Access shell:
     ```shell script
-    docker run --rm -p 8080:8080 -v $PWD:/usr/src/app --name asynctracer -d asynctracer npm run worker
+    docker exec -it worker bash
     ```
-4. Access shell:
+4. Attach Logs:
     ```shell script
-    docker exec -it asynctracer bash
+    docker-compose logs -f
     ```
-5. Attach Logs:
+5. Stop the container:
     ```shell script
-    docker logs --follow asynctracer
-    ```
-6. Stop the container:
-    ```shell script
-    docker kill asynctracer
+    docker-compose down
     ```
