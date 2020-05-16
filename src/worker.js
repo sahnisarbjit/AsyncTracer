@@ -1,4 +1,4 @@
-import http from 'http2';
+import http from 'http';
 
 const HOST = '0.0.0.0';
 const PORT = 8080;

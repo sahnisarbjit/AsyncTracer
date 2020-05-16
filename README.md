@@ -16,7 +16,7 @@
     ```shell script
     docker exec -it asynctracer bash
     ```
-4. Attach Logs:
+5. Attach Logs:
     ```shell script
     docker logs --follow asynctracer
     ```
