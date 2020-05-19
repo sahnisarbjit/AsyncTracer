@@ -1,6 +1,6 @@
 // An initial example to check if tracer only traces the required async function.
 
-import Tracer from "./src/tracer.js";
+import Tracer from "./src/Tracer.js";
 
 function doTimeout() {
     console.log("Starting timeout.");

@@ -1,51 +1,59 @@
 import async_hooks from "async_hooks";
-import fs from "fs";
-import util from "util";
+import { debug } from './Utils.js';
+
+const defaultOptions = {
+    debug: false,
+};
 
 class Tracer {
 
+    _options;
+
     // Tracks async operations currently in progress.
-    //
     curAsyncOps = new Map();
 
     // Async operations at the root of the hierarchy.
-    //
     rootAsyncOps = new Map();
 
     // Records all async operations that have ever happened.
-    //
     allAsyncOps = new Map();
 
     // Records the number of async operations in progress for each label.
-    //
     numAsyncOps = new Map();
 
     // Records the top-level execution contexts currently being tracked.
-    //
     executionContexts = new Set();
 
     // Maps execution context ids to labels.
-    //
     labelMap = new Map();
+
+    constructor(options) {
+        this._options = {
+            ...defaultOptions,
+            ...options
+        };
+
+        debug.enable(this._options.debug)
+    }
 
     inject = (label, fn) => {
         this.init();
 
-        const executionContext = new async_hooks.AsyncResource(label)
+        const executionContext = new async_hooks.AsyncResource(label);
         executionContext.runInAsyncScope(() => {
             const executionContextAsyncId = async_hooks.executionAsyncId();
             this.executionContexts.add(executionContextAsyncId);
             this.labelMap.set(executionContextAsyncId, label);
             fn();
         });
-    }
+    };
 
     stop = () => {
         if (this.asyncHook) {
             // checkAsyncOps(this, () => this.asyncHook.disable())
             this.asyncHook.disable()
         }
-    }
+    };
 
     init = () => {
         if (!this.asyncHook) {
@@ -54,10 +62,10 @@ class Tracer {
                     this.addAsyncOp(asyncId, type, triggerAsyncId, resource);
                 },
                 before: (asyncId) => {
-                    this.debug("before executing asyncId: ", asyncId);
+                    debug("before executing asyncId: ", asyncId);
                 },
                 after: (asyncId) => {
-                    this.debug("after successful callback of asyncId: ", asyncId);
+                    debug("after successful callback of asyncId: ", asyncId);
                 },
                 destroy: (asyncId) => {
                     this.removeAsyncOp(asyncId, "destroying asyncId: ");
@@ -69,7 +77,7 @@ class Tracer {
         }
 
         this.asyncHook.enable();
-    }
+    };
 
     findExecutionContextId = (asyncId) => {
         if (this.executionContexts.has(asyncId)) {
@@ -82,7 +90,7 @@ class Tracer {
         }
 
         return undefined;
-    }
+    };
 
     addAsyncOp = (asyncId, type, triggerAsyncId, resource) => {
         const executionContextId = this.findExecutionContextId(triggerAsyncId);
@@ -117,11 +125,11 @@ class Tracer {
 
         this.numAsyncOps.set(executionContextId, (this.numAsyncOps.get(executionContextId) || 0) + 1);
 
-        this.debug("initialized type: ", type, "with asyncId: ", asyncId, "having triggerAsyncId: ", triggerAsyncId);
-    }
+        debug("initialized type: ", type, "with asyncId: ", asyncId, "having triggerAsyncId: ", triggerAsyncId);
+    };
 
     removeAsyncOp = (asyncId, reason) => {
-        const asyncOp = this.curAsyncOps.get(asyncId)
+        const asyncOp = this.curAsyncOps.get(asyncId);
         if (!asyncOp) {
             return;
         }
@@ -135,16 +143,10 @@ class Tracer {
             const numAsyncOps = this.numAsyncOps.get(executionContextId);
             if (numAsyncOps !== undefined) {
                 this.numAsyncOps.set(executionContextId, numAsyncOps - 1);
-                this.debug(reason, asyncId);
+                debug(reason, asyncId);
             }
         }
-    }
-
-    debug = (...args) => {
-        fs.writeFileSync(1, `${util.format(...args)}\n`, {flag: 'a'});
-    }
+    };
 }
 
 export default Tracer;
-//
-// module.exports = Tracer;

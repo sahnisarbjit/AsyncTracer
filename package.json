@@ -4,8 +4,11 @@
   "description": "Track async services",
   "main": "index.js",
   "type": "module",
+  "engines": {
+    "node": ">=12"
+  },
   "scripts": {
-    "worker": "node --experimental-modules src/worker"
+    "worker": "node --experimental-modules src/worker.js"
   },
   "repository": {
     "type": "git",
