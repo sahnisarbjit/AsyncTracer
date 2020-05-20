@@ -1,19 +1,17 @@
-// An initial example to check if tracer only traces the required async function.
+const Tracer = require('./src/Tracer.js');
 
-import Tracer from "./src/Tracer.js";
-
-function doTimeout() {
-    console.log("Starting timeout.");
-
-    setTimeout(() => {
-        console.log("Timeout finished.");
-    }, 2000);
-}
+Tracer.debug();
 
 const tracer = new Tracer();
 
-tracer.inject('test-1', doTimeout);
-console.log("Middle of script");
-tracer.stop();
+console.log('Start of script');
 
-console.log("End of script");
+tracer.inject('simple.method', () => {
+    console.log('Starting timeout.');
+
+    setTimeout(() => {
+        console.log('Timeout finished.');
+    }, 500);
+});
+
+console.log('End of script');
