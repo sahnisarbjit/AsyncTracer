@@ -1,152 +1,170 @@
-import async_hooks from "async_hooks";
-import { debug } from './Utils.js';
+const { createHook, AsyncResource, executionAsyncId } = require('async_hooks');
+const fs = require('fs');
+const util = require('util');
 
-const defaultOptions = {
-    debug: false,
-};
+const Trace = require('./Trace');
+
+let debugging = false;
 
 class Tracer {
+    #asyncHook;
 
-    _options;
-
-    // Tracks async operations currently in progress.
-    curAsyncOps = new Map();
-
-    // Async operations at the root of the hierarchy.
-    rootAsyncOps = new Map();
-
-    // Records all async operations that have ever happened.
-    allAsyncOps = new Map();
-
-    // Records the number of async operations in progress for each label.
-    numAsyncOps = new Map();
+    #labels = new Map();
 
     // Records the top-level execution contexts currently being tracked.
-    executionContexts = new Set();
+    #rootContexts = new Set();
 
-    // Maps execution context ids to labels.
-    labelMap = new Map();
+    // Tracks async operations currently in progress.
+    #curTraces = new Map();
 
-    constructor(options) {
-        this._options = {
-            ...defaultOptions,
-            ...options
-        };
+    // Records all async operations that have ever happened.
+    #allTraces = new Map();
 
-        debug.enable(this._options.debug)
+    // Records the number of async operations in progress for each label.
+    #numTraces = new Map();
+
+    constructor() {
+        this.#asyncHook = createHook({
+            init: (asyncId, type, triggerAsyncId) => {
+                this.#addTrace(asyncId, type, triggerAsyncId);
+            },
+            destroy: (asyncId) => {
+                this.#removeTrace(asyncId, 'Destroy');
+            },
+            promiseResolve: (asyncId) => {
+                this.#removeTrace(asyncId, 'Promise Resolved');
+            },
+        });
+
+        this.enable();
     }
 
-    inject = (label, fn) => {
-        this.init();
+    inject(label, fn) {
+        if (!label || typeof label !== 'string') {
+            throw new Error('Please provide trace label');
+        }
 
-        const executionContext = new async_hooks.AsyncResource(label);
-        executionContext.runInAsyncScope(() => {
-            const executionContextAsyncId = async_hooks.executionAsyncId();
-            this.executionContexts.add(executionContextAsyncId);
-            this.labelMap.set(executionContextAsyncId, label);
+        this.enable();
+
+        const rootContext = new AsyncResource(label);
+        rootContext.runInAsyncScope(() => {
+            const asyncId = executionAsyncId();
+
+            // TODO: Start a root trace instance here.
+
+            this.#rootContexts.add(asyncId);
+            this.#labels.set(asyncId, label);
+
             fn();
         });
-    };
+    }
 
-    stop = () => {
-        if (this.asyncHook) {
-            // checkAsyncOps(this, () => this.asyncHook.disable())
-            this.asyncHook.disable()
-        }
-    };
+    enable() {
+        this.#asyncHook.enable();
+    }
 
-    init = () => {
-        if (!this.asyncHook) {
-            this.asyncHook = async_hooks.createHook({
-                init: (asyncId, type, triggerAsyncId, resource) => {
-                    this.addAsyncOp(asyncId, type, triggerAsyncId, resource);
-                },
-                before: (asyncId) => {
-                    debug("before executing asyncId: ", asyncId);
-                },
-                after: (asyncId) => {
-                    debug("after successful callback of asyncId: ", asyncId);
-                },
-                destroy: (asyncId) => {
-                    this.removeAsyncOp(asyncId, "destroying asyncId: ");
-                },
-                promiseResolve: (asyncId) => {
-                    this.removeAsyncOp(asyncId, "promiseResolve asyncId: ");
-                }
-            })
-        }
+    disable() {
+        this.#asyncHook.disable();
+    }
 
-        this.asyncHook.enable();
-    };
-
-    findExecutionContextId = (asyncId) => {
-        if (this.executionContexts.has(asyncId)) {
+    #findRootContextId = (asyncId) => {
+        if (this.#rootContexts.has(asyncId)) {
             return asyncId;
         }
 
-        const asyncOp = this.allAsyncOps.get(asyncId);
-        if (asyncOp) {
-            return asyncOp.executionContextId;
+        const trace = this.#allTraces.get(asyncId);
+        if (trace) {
+            return trace.getRootContextId();
         }
 
         return undefined;
     };
 
-    addAsyncOp = (asyncId, type, triggerAsyncId, resource) => {
-        const executionContextId = this.findExecutionContextId(triggerAsyncId);
-        if (executionContextId === undefined) {
+    #addTrace = (asyncId, type, triggerAsyncId) => {
+        const rootContextId = this.#findRootContextId(triggerAsyncId);
+        if (rootContextId === undefined) {
             return;
         }
 
-        const error = {};
-        Error.captureStackTrace(error);
+        const trace = new Trace(asyncId, type, triggerAsyncId, rootContextId);
 
-        const stack = error.stack.split("\n").map(line => line.trim());
-
-        const asyncOp = {
-            asyncId,
-            type,
-            triggerAsyncId,
-            children: new Map(),
-            stack,
-            status: "in-flight",
-            executionContextId,
-        };
-
-        const parentOperation = this.allAsyncOps.get(triggerAsyncId);
-        if (parentOperation) {
-            parentOperation.children.set(asyncId, asyncOp); // Record the hierarchy of asynchronous operations.
-        } else {
-            this.rootAsyncOps.set(asyncId, asyncOp);
+        const parentTrace = this.#allTraces.get(triggerAsyncId);
+        if (parentTrace) {
+            // Record the hierarchy of asynchronous operations.
+            parentTrace.addChild(asyncId, trace);
         }
 
-        this.curAsyncOps.set(asyncId, asyncOp);
-        this.allAsyncOps.set(asyncId, asyncOp);
+        this.#curTraces.set(asyncId, trace);
+        this.#allTraces.set(asyncId, trace);
 
-        this.numAsyncOps.set(executionContextId, (this.numAsyncOps.get(executionContextId) || 0) + 1);
+        this.#numTraces.set(
+            rootContextId,
+            (this.#numTraces.get(rootContextId) || 0) + 1,
+        );
 
-        debug("initialized type: ", type, "with asyncId: ", asyncId, "having triggerAsyncId: ", triggerAsyncId);
+        const label = this.#labels.get(rootContextId);
+        this.#logger(
+            'LABEL: %s -> Initialize -> Type: %s, AsyncId: %s, ParentAsyncId: %s, ContextId: %s',
+            label,
+            type,
+            asyncId,
+            triggerAsyncId,
+            rootContextId,
+        );
     };
 
-    removeAsyncOp = (asyncId, reason) => {
-        const asyncOp = this.curAsyncOps.get(asyncId);
-        if (!asyncOp) {
+    #removeTrace = (asyncId, reason) => {
+        const trace = this.#curTraces.get(asyncId);
+        if (!trace) {
             return;
         }
 
-        asyncOp.status = "completed";
+        trace.complete();
 
-        this.curAsyncOps.delete(asyncId);
+        const rootContextId = this.#findRootContextId(asyncId);
+        const label = this.#labels.get(rootContextId);
 
-        const executionContextId = this.findExecutionContextId(asyncId);
-        if (executionContextId !== undefined) {
-            const numAsyncOps = this.numAsyncOps.get(executionContextId);
-            if (numAsyncOps !== undefined) {
-                this.numAsyncOps.set(executionContextId, numAsyncOps - 1);
-                debug(reason, asyncId);
+        if (rootContextId !== undefined) {
+            const numTraces = this.#numTraces.get(rootContextId);
+            if (numTraces !== undefined) {
+                this.#logger('LABEL: %s -> %s -> AsyncId: %s', label, reason, asyncId);
+                this.#numTraces.set(rootContextId, numTraces - 1);
             }
         }
+
+        this.#collect(trace);
+        this.#curTraces.delete(asyncId);
+        this.#labels.delete(asyncId);
     };
+
+    #collect = (trace) => {
+        if (trace.isCollectible()) {
+            // TODO: Send this trace to collector. Logging for now.
+            this.#logger('LABEL: %s -> Collecting:', trace.getLabel(), trace.toJSON());
+
+            this.#removeCollectedTrace(trace);
+        }
+    };
+
+    #removeCollectedTrace = (trace) => {
+        if (trace.hasChildren()) {
+            trace.getChildren().forEach(((child) => {
+                this.#removeCollectedTrace(child);
+            }));
+        }
+
+        this.#allTraces.delete(trace.getAsyncId());
+    };
+
+    #logger = (...args) => {
+        if (!debugging) return;
+
+        fs.writeFileSync(1, `${util.format(...args)}\n`, { flag: 'a' });
+    };
+
+    static debug() {
+        debugging = true;
+    }
 }
 
-export default Tracer;
+module.exports = Tracer;

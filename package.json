@@ -1,27 +1,38 @@
 {
-  "name": "asynctracer",
-  "version": "0.0.1",
-  "description": "Track async services",
-  "main": "index.js",
-  "type": "module",
-  "engines": {
-    "node": ">=12"
-  },
-  "scripts": {
-    "worker": "node --experimental-modules src/worker.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/sahnisarbjit/AsyncTracer.git"
-  },
-  "keywords": [
-    "async",
-    "tracing"
-  ],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/sahnisarbjit/AsyncTracer/issues"
-  },
-  "homepage": "https://github.com/sahnisarbjit/AsyncTracer#readme"
+    "name": "asynctracer",
+    "version": "0.0.1",
+    "description": "Track async services",
+    "main": "index.js",
+    "type": "module",
+    "engines": {
+        "node": ">=12"
+    },
+    "scripts": {
+        "lint": "eslint *.js src/*.js src/**/*.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/sahnisarbjit/AsyncTracer.git"
+    },
+    "keywords": [
+        "async",
+        "tracing"
+    ],
+    "author": "",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/sahnisarbjit/AsyncTracer/issues"
+    },
+    "homepage": "https://github.com/sahnisarbjit/AsyncTracer#readme",
+    "devDependencies": {
+        "@babel/core": "^7.9.6",
+        "@babel/plugin-syntax-class-properties": "^7.8.3",
+        "babel-eslint": "v11.0.0-beta.2",
+        "eslint": "^6.8.0",
+        "eslint-config-airbnb-base": "^14.1.0",
+        "eslint-plugin-import": "^2.20.2"
+    },
+    "dependencies": {
+        "uuid": "^8.0.0"
+    }
 }
