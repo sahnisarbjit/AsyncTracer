@@ -3,7 +3,6 @@
     "version": "0.0.1",
     "description": "Track async services",
     "main": "index.js",
-    "type": "module",
     "engines": {
         "node": ">=12"
     },
@@ -33,6 +32,7 @@
         "eslint-plugin-import": "^2.20.2"
     },
     "dependencies": {
-        "uuid": "^8.0.0"
+        "uuid": "^8.0.0",
+        "process": "^0.11.10"
     }
 }
