@@ -9,8 +9,6 @@ class WorkerThread extends Worker {
 
     #cb = (err, result) => {
         if (err) return console.error(err);
-        console.log("[[Worker thread execution finished]]")
-        console.log("Response Data: ", result);
     };
 
     #initializeListeners = () => {

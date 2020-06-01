@@ -1,8 +1,17 @@
 const Tracer = require('./src/Tracer.js');
+const Worker = require('./src/Worker.js');
+
+console.log("Starting worker");
+
+const worker = new Worker({
+    port: 4455,
+    name: "test",
+});
 
 Tracer.debug();
 
 const tracer = new Tracer();
+tracer.setCollector(worker);
 
 console.log('Start of script');
 
