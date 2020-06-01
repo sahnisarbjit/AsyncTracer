@@ -23,7 +23,10 @@ class Tracer {
     // Records the number of async operations in progress for each label.
     #numTraces = new Map();
 
-    constructor() {
+    #collector;
+
+    constructor(collector) {
+        this.#collector = collector;
         this.#asyncHook = createHook({
             init: (asyncId, type, triggerAsyncId) => {
                 this.#addTrace(asyncId, type, triggerAsyncId);
@@ -162,9 +165,8 @@ class Tracer {
         if (!pendingTraces && rootTrace.isCollectible()) {
             const traceData = rootTrace.toJSON();
 
-            // TODO: Send this trace to collector. Logging for now.
-
-            this.#logger('LABEL: %s -> Collecting:', rootTrace.getLabel(), JSON.stringify(traceData));
+            // this.#logger('LABEL: %s -> Collecting:', rootTrace.getLabel(), JSON.stringify(traceData));
+            this.#collector.sendData('LABEL: ' + rootTrace.getLabel() + ' -> Collecting:' + JSON.stringify(traceData));
 
             this.#removeCollectedTrace(trace);
         }
