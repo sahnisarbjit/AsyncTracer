@@ -12,7 +12,7 @@ class Tracer {
     #labels = new Map();
 
     // Records the top-level execution contexts currently being tracked.
-    #rootContexts = new Set();
+    #rootTraces = new Map();
 
     // Tracks async operations currently in progress.
     #curTraces = new Map();
@@ -50,12 +50,17 @@ class Tracer {
         rootContext.runInAsyncScope(() => {
             const asyncId = executionAsyncId();
 
-            // TODO: Start a root trace instance here.
+            const trace = new Trace(asyncId);
+            trace.setLabel(label);
 
-            this.#rootContexts.add(asyncId);
+            this.#allTraces.set(asyncId, trace);
+            this.#rootTraces.set(asyncId, trace);
+            this.#numTraces.set(asyncId, 0);
             this.#labels.set(asyncId, label);
 
             fn();
+
+            trace.complete();
         });
     }
 
@@ -67,28 +72,38 @@ class Tracer {
         this.#asyncHook.disable();
     }
 
-    #findRootContextId = (asyncId) => {
-        if (this.#rootContexts.has(asyncId)) {
-            return asyncId;
+    log(key, value) {
+        this.#allTraces.get(executionAsyncId()).log(key, value);
+        return this;
+    }
+
+    tag(key, value) {
+        this.#allTraces.get(executionAsyncId()).tag(key, value);
+        return this;
+    }
+
+    #findRootTrace = (asyncId) => {
+        if (this.#rootTraces.has(asyncId)) {
+            return this.#rootTraces.get(asyncId);
         }
 
         const trace = this.#allTraces.get(asyncId);
         if (trace) {
-            return trace.getRootContextId();
+            return trace.getRootTrace();
         }
 
         return undefined;
     };
 
     #addTrace = (asyncId, type, triggerAsyncId) => {
-        const rootContextId = this.#findRootContextId(triggerAsyncId);
-        if (rootContextId === undefined) {
+        const rootContextTrace = this.#findRootTrace(triggerAsyncId);
+        if (rootContextTrace === undefined) {
             return;
         }
 
-        const trace = new Trace(asyncId, type, triggerAsyncId, rootContextId);
-
         const parentTrace = this.#allTraces.get(triggerAsyncId);
+        const trace = new Trace(asyncId, type, parentTrace, rootContextTrace);
+
         if (parentTrace) {
             // Record the hierarchy of asynchronous operations.
             parentTrace.addChild(asyncId, trace);
@@ -97,9 +112,10 @@ class Tracer {
         this.#curTraces.set(asyncId, trace);
         this.#allTraces.set(asyncId, trace);
 
+        const rootContextId = rootContextTrace.getAsyncId();
         this.#numTraces.set(
             rootContextId,
-            (this.#numTraces.get(rootContextId) || 0) + 1,
+            this.#numTraces.get(rootContextId) + 1,
         );
 
         const label = this.#labels.get(rootContextId);
@@ -121,11 +137,13 @@ class Tracer {
 
         trace.complete();
 
-        const rootContextId = this.#findRootContextId(asyncId);
-        const label = this.#labels.get(rootContextId);
+        const rootContextTrace = this.#findRootTrace(asyncId);
 
-        if (rootContextId !== undefined) {
+        if (rootContextTrace !== undefined) {
+            const rootContextId = rootContextTrace.getAsyncId();
+            const label = this.#labels.get(rootContextId);
             const numTraces = this.#numTraces.get(rootContextId);
+
             if (numTraces !== undefined) {
                 this.#logger('LABEL: %s -> %s -> AsyncId: %s', label, reason, asyncId);
                 this.#numTraces.set(rootContextId, numTraces - 1);
@@ -138,9 +156,15 @@ class Tracer {
     };
 
     #collect = (trace) => {
-        if (trace.isCollectible()) {
+        const rootTrace = trace.getRootTrace();
+        const pendingTraces = this.#numTraces.get(rootTrace.getAsyncId());
+
+        if (!pendingTraces && rootTrace.isCollectible()) {
+            const traceData = rootTrace.toJSON();
+
             // TODO: Send this trace to collector. Logging for now.
-            this.#logger('LABEL: %s -> Collecting:', trace.getLabel(), trace.toJSON());
+
+            this.#logger('LABEL: %s -> Collecting:', rootTrace.getLabel(), JSON.stringify(traceData));
 
             this.#removeCollectedTrace(trace);
         }

@@ -12,9 +12,42 @@ const simplify = (map) => {
 
     const obj = {};
 
-    map.keys().forEach((value, key) => {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const [key, value] of map) {
         obj[key] = value;
-    });
+    }
+
+    return obj;
+};
+
+const filter = (obj) => {
+    if (obj == null) {
+        return null;
+    }
+
+    if (obj instanceof Array) {
+        if (!obj.length) {
+            return null;
+        }
+
+        obj.forEach(filter);
+    } else if (obj.constructor === Object) {
+        const keys = Object.keys(obj);
+        if (!keys.length) {
+            return null;
+        }
+
+        keys.forEach((key) => {
+            const value = obj[key];
+            const filteredValue = filter(value);
+
+            if (filteredValue === null) {
+                delete obj[key];
+            } else {
+                obj[key] = filteredValue;
+            }
+        });
+    }
 
     return obj;
 };
@@ -26,9 +59,9 @@ class Trace {
 
     #type;
 
-    #parentAsyncId;
+    #parentTrace;
 
-    #rootContextId;
+    #rootTrace;
 
     #children = new Map();
 
@@ -44,19 +77,27 @@ class Trace {
 
     #endTime = null;
 
-    constructor(asyncId, type, parentAsyncId, rootContextId) {
+    #label = '';
+
+    constructor(asyncId, type, parentTrace, rootTrace) {
         this.#id = uuid();
         this.#startTime = new Date().getTime();
 
         this.#asyncId = asyncId;
         this.#type = type;
-        this.#parentAsyncId = parentAsyncId;
-        this.#rootContextId = rootContextId;
+        this.#parentTrace = parentTrace;
 
-        const error = {};
-        Error.captureStackTrace(error);
+        if (parentTrace) {
+            this.#parentTrace = parentTrace;
+            parentTrace.addChild(asyncId, this);
+        }
 
-        this.#stack = error.stack.split('\n').map((line) => line.trim());
+        this.#rootTrace = rootTrace || this;
+
+        // TODO: Fix stack tracing
+        // const error = {};
+        // Error.captureStackTrace(error);
+        // this.#stack = error.stack.split('\n').map((line) => line.trim());
     }
 
     complete() {
@@ -78,9 +119,13 @@ class Trace {
         return this.#asyncId;
     }
 
-    getParentAsyncId() {
-        // TODO: Fix parent id
-        return this.#parentAsyncId;
+    getParent() {
+        return this.#parentTrace;
+    }
+
+    getParentId() {
+        const parent = this.getParent();
+        return parent ? parent.getId() : null;
     }
 
     getStartTime() {
@@ -91,8 +136,8 @@ class Trace {
         return this.#endTime;
     }
 
-    getRootContextId() {
-        return this.#rootContextId;
+    getRootTrace() {
+        return this.#rootTrace;
     }
 
     getStatus() {
@@ -115,6 +160,15 @@ class Trace {
         return this.#stack;
     }
 
+    getLabel() {
+        return this.#label;
+    }
+
+    setLabel(label) {
+        this.#label = label;
+        return this;
+    }
+
     addChild(asyncId, trace) {
         this.getChildren().set(asyncId, trace);
     }
@@ -130,7 +184,7 @@ class Trace {
     }
 
     isRoot() {
-        return this.getRootContextId() === this.getAsyncId();
+        return this.getRootTrace() === this;
     }
 
     isComplete() {
@@ -162,41 +216,23 @@ class Trace {
     }
 
     toJSON() {
-        const logs = simplify(this.getLogs());
-        const tags = simplify(this.getTags());
-
         const children = [];
         this.getChildren().forEach((trace) => {
             children.push(trace.toJSON());
         });
 
-        const json = {
+        return filter({
             id: this.getId(),
-            parent_id: this.getParentAsyncId(),
+            parent_id: this.getParentId(),
             trace_id: this.getAsyncId(),
             type: this.getType(),
             start_time: this.getStartTime(),
             end_time: this.getEndTime(),
-        };
-
-        if (logs) {
-            json.logs = logs;
-        }
-
-        if (tags) {
-            json.tags = tags;
-        }
-
-        if (children.length) {
-            json.children = children;
-        }
-
-        const stack = this.getStack();
-        if (stack) {
-            json.stack = stack;
-        }
-
-        return json;
+            children,
+            logs: simplify(this.getLogs()),
+            tags: simplify(this.getTags()),
+            stack: this.getStack(),
+        });
     }
 }
 

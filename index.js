@@ -9,7 +9,11 @@ console.log('Start of script');
 tracer.inject('simple.method', () => {
     console.log('Starting timeout.');
 
+    tracer.tag('level', 0);
+
     setTimeout(() => {
+        tracer.log('Author', 'admin');
+
         console.log('Timeout finished.');
     }, 500);
 });
