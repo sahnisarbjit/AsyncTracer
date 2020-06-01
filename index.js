@@ -10,8 +10,7 @@ const worker = new Worker({
 
 Tracer.debug();
 
-const tracer = new Tracer();
-tracer.setCollector(worker);
+const tracer = new Tracer(worker);
 
 console.log('Start of script');
 

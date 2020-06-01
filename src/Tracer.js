@@ -25,7 +25,8 @@ class Tracer {
 
     #collector;
 
-    constructor() {
+    constructor(collector) {
+        this.#collector = collector;
         this.#asyncHook = createHook({
             init: (asyncId, type, triggerAsyncId) => {
                 this.#addTrace(asyncId, type, triggerAsyncId);
@@ -82,10 +83,6 @@ class Tracer {
     tag(key, value) {
         this.#allTraces.get(executionAsyncId()).tag(key, value);
         return this;
-    }
-
-    setCollector(collector) {
-        this.#collector = collector;
     }
 
     #findRootTrace = (asyncId) => {
