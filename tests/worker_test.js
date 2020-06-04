@@ -1,5 +1,5 @@
 const process = require('process');
-const Worker = require('./src/Worker.js');
+const { Worker } = require('../index');
 
 console.log('Starting worker');
 
