@@ -93,11 +93,6 @@ class Trace {
         }
 
         this.#rootTrace = rootTrace || this;
-
-        // TODO: Fix stack tracing
-        // const error = {};
-        // Error.captureStackTrace(error);
-        // this.#stack = error.stack.split('\n').map((line) => line.trim());
     }
 
     complete() {
@@ -213,6 +208,16 @@ class Trace {
 
     hasChildren() {
         return this.getChildren().size > 0;
+    }
+
+    error(e) {
+        this.#stack = {
+            type: e.name,
+            message: e.message,
+            stack: e.stack.split('\n').map((line) => line.trim()),
+        };
+
+        return this;
     }
 
     toJSON() {
