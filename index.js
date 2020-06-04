@@ -1,11 +1,11 @@
 const Tracer = require('./src/Tracer.js');
 const Worker = require('./src/Worker.js');
 
-console.log("Starting worker");
+console.log('Starting worker');
 
 const worker = new Worker({
     port: 4455,
-    name: "test",
+    name: 'test',
 });
 
 Tracer.debug();
@@ -21,6 +21,12 @@ tracer.inject('simple.method', () => {
 
     setTimeout(() => {
         tracer.log('Author', 'admin');
+
+        try {
+            throw new Error('This must be caught!!');
+        } catch (e) {
+            tracer.error(e);
+        }
 
         console.log('Timeout finished.');
     }, 500);

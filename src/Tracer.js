@@ -71,19 +71,25 @@ class Tracer {
         this.#asyncHook.enable();
     }
 
-    disable() {
-        this.#asyncHook.disable();
-    }
-
     log(key, value) {
-        this.#allTraces.get(executionAsyncId()).log(key, value);
+        this.#getCurrentTrace().log(key, value);
         return this;
     }
 
     tag(key, value) {
-        this.#allTraces.get(executionAsyncId()).tag(key, value);
+        this.#getCurrentTrace().tag(key, value);
         return this;
     }
+
+    error(e) {
+        const trace = this.#getCurrentTrace();
+        trace.error(e);
+        this.#removeTrace(trace.getAsyncId(), 'Exception');
+
+        return this;
+    }
+
+    #getCurrentTrace = () => this.#allTraces.get(executionAsyncId());
 
     #findRootTrace = (asyncId) => {
         if (this.#rootTraces.has(asyncId)) {
@@ -165,8 +171,14 @@ class Tracer {
         if (!pendingTraces && rootTrace.isCollectible()) {
             const traceData = rootTrace.toJSON();
 
-            // this.#logger('LABEL: %s -> Collecting:', rootTrace.getLabel(), JSON.stringify(traceData));
-            this.#collector.sendData('LABEL: ' + rootTrace.getLabel() + ' -> Collecting:' + JSON.stringify(traceData));
+            // this.#logger(
+            //     'LABEL: %s -> Collecting:',
+            //     rootTrace.getLabel(),
+            //     JSON.stringify(traceData),
+            // );
+            this.#collector.sendData(
+                `LABEL: ${rootTrace.getLabel()} -> Collecting:${JSON.stringify(traceData)}`,
+            );
 
             this.#removeCollectedTrace(trace);
         }
