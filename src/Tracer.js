@@ -26,6 +26,10 @@ class Tracer {
     #collector;
 
     constructor(collector) {
+        if (!collector) {
+            throw new Error('Please provide collector to Tracer');
+        }
+
         this.#collector = collector;
         this.#asyncHook = createHook({
             init: (asyncId, type, triggerAsyncId) => {
@@ -86,6 +90,11 @@ class Tracer {
         trace.error(e);
         this.#removeTrace(trace.getAsyncId(), 'Exception');
 
+        return this;
+    }
+
+    markRemote() {
+        this.#getCurrentTrace().markRemote();
         return this;
     }
 
@@ -171,14 +180,14 @@ class Tracer {
         if (!pendingTraces && rootTrace.isCollectible()) {
             const traceData = rootTrace.toJSON();
 
-            // this.#logger(
-            //     'LABEL: %s -> Collecting:',
-            //     rootTrace.getLabel(),
-            //     JSON.stringify(traceData),
-            // );
-            this.#collector.sendData(
-                `LABEL: ${rootTrace.getLabel()} -> Collecting:${JSON.stringify(traceData)}`,
+            this.#logger(
+                'LABEL: %s -> Collecting:',
+                rootTrace.getLabel(),
+                JSON.stringify(traceData),
             );
+
+            // Non-blocking
+            setTimeout(() => this.#collector.write(traceData), 0);
 
             this.#removeCollectedTrace(trace);
         }
