@@ -35,4 +35,23 @@ app.get('/complex', (req, res) => {
     }, 500);
 });
 
+app.get('/exception', (req, res) => {
+    const task = new Promise(((resolve, reject) => {
+        // Mimic performance delay
+        setTimeout(() => {
+            reject(new Error('This route is broken'));
+        }, 150);
+    }));
+
+    task
+        .then(() => {
+            console.log('THIS MUST NEVER BE CALLED!!');
+            res.send('Success!!');
+        })
+        .catch((error) => {
+            tracer.error(error);
+            res.send('Failed as expected!!');
+        });
+});
+
 app.listen(port, () => console.log(`Example app listening at http://localhost:${port}`));
