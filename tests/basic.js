@@ -1,15 +1,10 @@
-const { Tracer, Worker } = require('../index');
+const { Tracer, NoopCollector } = require('../index');
 
 console.log('Starting worker');
 
-const worker = new Worker({
-    port: 4455,
-    name: 'test',
-});
-
 Tracer.debug();
 
-const tracer = new Tracer(worker);
+const tracer = new Tracer(NoopCollector);
 
 console.log('Start of script');
 

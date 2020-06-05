@@ -79,6 +79,8 @@ class Trace {
 
     #label = '';
 
+    #remote = null;
+
     constructor(asyncId, type, parentTrace, rootTrace) {
         this.#id = uuid();
         this.#startTime = new Date().getTime();
@@ -178,6 +180,11 @@ class Trace {
         return this;
     }
 
+    markRemote() {
+        this.#remote = true;
+        return this;
+    }
+
     isRoot() {
         return this.getRootTrace() === this;
     }
@@ -228,14 +235,14 @@ class Trace {
 
         return filter({
             id: this.getId(),
-            parent_id: this.getParentId(),
-            trace_id: this.getAsyncId(),
+            parent_id: this.isRoot() ? null : this.getRootTrace().getId(),
             type: this.getType(),
             start_time: this.getStartTime(),
             end_time: this.getEndTime(),
             children,
             logs: simplify(this.getLogs()),
             tags: simplify(this.getTags()),
+            remote: this.#remote,
             stack: this.getStack(),
         });
     }

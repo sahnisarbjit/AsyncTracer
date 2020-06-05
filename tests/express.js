@@ -1,16 +1,24 @@
 const express = require('express');
 
-const { Tracer } = require('../index');
+const { Tracer, NoopCollector } = require('../index');
 
 const app = express();
 const port = 3000;
 
 Tracer.debug();
 
-const tracer = new Tracer();
+const tracer = new Tracer(NoopCollector);
 
 app.use((req, res, next) => {
-    tracer.inject('express-app', () => next());
+    tracer.inject('express-app', () => {
+        tracer
+            .tag('host', req.hostname)
+            .tag('ip', req.ip)
+            .tag('method', req.method)
+            .tag('url', req.originalUrl);
+
+        next();
+    });
 });
 
 app.get('/', (req, res) => res.send('Hello World!'));
@@ -18,6 +26,11 @@ app.get('/', (req, res) => res.send('Hello World!'));
 app.get('/complex', (req, res) => {
     // Mimic network/db call
     setTimeout(() => {
+        tracer
+            .markRemote()
+            .tag('url', 'https://api.host.com')
+            .tag('status', 200);
+
         res.send('Delayed Hello World!');
     }, 500);
 });
