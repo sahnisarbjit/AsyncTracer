@@ -22,5 +22,5 @@
     ```
 6. Run example:
     ```shell script
-    docker run --rm -v $PWD:/usr/src/app -w /usr/src/app node:12 node index.js
+    docker run --rm -v $PWD:/usr/src/app -w /usr/src/app node:12 node --experimental-modules index.js
     ```
