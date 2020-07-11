@@ -5,7 +5,6 @@ jest.mock('uuid', () => ({
 }));
 jest.mock('async_hooks', () => ({
     ...jest.requireActual('async_hooks'),
-    // executionAsyncId: jest.fn(() => '1123'),
 }));
 
 describe('Tracer injection label tests', () => {

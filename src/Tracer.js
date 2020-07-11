@@ -4,11 +4,17 @@ const util = require('util');
 
 const Trace = require('./Trace');
 
+// To enable debug mode or not
 let debugging = false;
 
+/**
+ * Tracer library
+ */
 class Tracer {
+    // Async hook lib instance
     #asyncHook;
 
+    // Trace labels
     #labels = new Map();
 
     // Records the top-level execution contexts currently being tracked.
@@ -23,8 +29,13 @@ class Tracer {
     // Records the number of async operations in progress for each label.
     #numTraces = new Map();
 
+    // Collector to write the trace data on collect
     #collector;
 
+    /**
+     * Tracer constructor
+     * @param collector
+     */
     constructor(collector) {
         if (!collector) {
             throw new Error('Please provide collector to Tracer');
@@ -46,6 +57,11 @@ class Tracer {
         this.enable();
     }
 
+    /**
+     * Injector wraps the given function in an async execution context and starts the trace.
+     * @param label
+     * @param fn
+     */
     inject(label, fn) {
         if (!label || typeof label !== 'string') {
             throw new Error('Please provide trace label');
@@ -71,20 +87,40 @@ class Tracer {
         });
     }
 
+    /**
+     * Enables the async hook tracer
+     */
     enable() {
         this.#asyncHook.enable();
     }
 
+    /**
+     * Adds a log to the current trace
+     * @param key
+     * @param value
+     * @returns {Tracer}
+     */
     log(key, value) {
         this.#getCurrentTrace().log(key, value);
         return this;
     }
 
+    /**
+     * Adds a tag to the current trace
+     * @param key
+     * @param value
+     * @returns {Tracer}
+     */
     tag(key, value) {
         this.#getCurrentTrace().tag(key, value);
         return this;
     }
 
+    /**
+     * Error handling. Adds an error stack to the trace and completes it
+     * @param e
+     * @returns {Tracer}
+     */
     error(e) {
         const trace = this.#getCurrentTrace();
         trace.error(e);
@@ -93,13 +129,26 @@ class Tracer {
         return this;
     }
 
+    /**
+     * Marks the current trace as remote
+     * @returns {Tracer}
+     */
     markRemote() {
         this.#getCurrentTrace().markRemote();
         return this;
     }
 
+    /**
+     * Fetches the current trace
+     * @returns {any}
+     */
     #getCurrentTrace = () => this.#allTraces.get(executionAsyncId());
 
+    /**
+     * Finds and returns the root trace for the execution context
+     * @param asyncId
+     * @returns {undefined|any}
+     */
     #findRootTrace = (asyncId) => {
         if (this.#rootTraces.has(asyncId)) {
             return this.#rootTraces.get(asyncId);
@@ -113,6 +162,12 @@ class Tracer {
         return undefined;
     };
 
+    /**
+     * Adds a new trace to the context
+     * @param asyncId
+     * @param type
+     * @param triggerAsyncId
+     */
     #addTrace = (asyncId, type, triggerAsyncId) => {
         const rootContextTrace = this.#findRootTrace(triggerAsyncId);
         if (rootContextTrace === undefined) {
@@ -147,6 +202,12 @@ class Tracer {
         );
     };
 
+    /**
+     * Removes a trace from the lib context
+     * Marks the trace complete and collects it
+     * @param asyncId
+     * @param reason
+     */
     #removeTrace = (asyncId, reason) => {
         const trace = this.#curTraces.get(asyncId);
         if (!trace) {
@@ -173,6 +234,11 @@ class Tracer {
         this.#labels.delete(asyncId);
     };
 
+    /**
+     * Collects a trace
+     * Only possible if there are no pending traces and the root trace is collectible
+     * @param trace
+     */
     #collect = (trace) => {
         const rootTrace = trace.getRootTrace();
         const pendingTraces = this.#numTraces.get(rootTrace.getAsyncId());
@@ -193,6 +259,10 @@ class Tracer {
         }
     };
 
+    /**
+     * Removes a collected trace from tracer lib
+     * @param trace
+     */
     #removeCollectedTrace = (trace) => {
         if (trace.hasChildren()) {
             trace.getChildren().forEach(((child) => {
@@ -203,12 +273,21 @@ class Tracer {
         this.#allTraces.delete(trace.getAsyncId());
     };
 
+    /**
+     * Default lib logger
+     * Logs to the console if debugging is set to true
+     * @param args
+     */
     #logger = (...args) => {
         if (!debugging) return;
 
         fs.writeFileSync(1, `${util.format(...args)}\n`, { flag: 'a' });
     };
 
+    /**
+     * Sets lib to debug mode
+     * Starts logging to console
+     */
     static debug() {
         debugging = true;
     }
