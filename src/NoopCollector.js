@@ -1,6 +1,10 @@
 const fs = require('fs');
 const util = require('util');
 
+/**
+ * Default noop collector implementation.
+ * @type {{write(*=): void}}
+ */
 module.exports = {
     write(data) {
         fs.writeFileSync(
